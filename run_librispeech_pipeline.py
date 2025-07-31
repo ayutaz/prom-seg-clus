@@ -32,7 +32,12 @@ def check_requirements():
 def run_clustering():
     """prom_seg_clusを実行"""
 
+    import sys
+
+    # uvで実行するように修正
     cmd = [
+        "uv",
+        "run",
         "python",
         "prom_seg_clus.py",
         "hubert",  # モデル名
