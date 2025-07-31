@@ -21,6 +21,23 @@ uv sync
 source .venv/bin/activate
 ```
 
+## 開発環境
+
+### コード品質管理
+このプロジェクトはruffを使用してコード品質を管理しています。
+
+```bash
+# フォーマットとlintチェック
+make check
+
+# 個別実行
+uv run ruff format .  # コードフォーマット
+uv run ruff check . --fix  # lintチェックと自動修正
+
+# pre-commitフックのインストール（初回のみ）
+uv run pre-commit install
+```
+
 ## 主要コマンド
 
 ### 特徴操作とクラスタリング実行

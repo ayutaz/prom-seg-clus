@@ -6,13 +6,15 @@ Contact: 24227013@sun.ac.za
 Date: April 2024
 """
 
-import numpy as np
-import random
-import torch
-from glob import glob
-import os
 import json
+import os
+import random
+from glob import glob
+
+import numpy as np
+import torch
 from sklearn.preprocessing import StandardScaler
+
 
 class Features:
     """
@@ -40,7 +42,14 @@ class Features:
     """
 
     def __init__(
-        self, wav_dir, root_dir, model_name, layer, extension='.flac', num_files=-1, frames_per_ms=20
+        self,
+        wav_dir,
+        root_dir,
+        model_name,
+        layer,
+        extension=".flac",
+        num_files=-1,
+        frames_per_ms=20,
     ):
         self.wav_dir = wav_dir
         self.root_dir = root_dir
@@ -68,25 +77,46 @@ class Features:
         """
 
         if self.layer != -1:
-            layer = 'layer_' + str(self.layer)
+            layer = "layer_" + str(self.layer)
             if speaker is not None:
-                all_features = sorted(glob(os.path.join(self.root_dir, self.model_name, layer, f'**/{speaker}*.npy'), recursive=True))
+                all_features = sorted(
+                    glob(
+                        os.path.join(self.root_dir, self.model_name, layer, f"**/{speaker}*.npy"),
+                        recursive=True,
+                    )
+                )
             else:
-                all_features = sorted(glob(os.path.join(self.root_dir, self.model_name, layer, "**/*.npy"), recursive=True))
+                all_features = sorted(
+                    glob(
+                        os.path.join(self.root_dir, self.model_name, layer, "**/*.npy"),
+                        recursive=True,
+                    )
+                )
         else:
             if speaker is not None:
-                all_features = sorted(glob(os.path.join(self.root_dir, self.model_name, f'**/{speaker}*.npy'), recursive=True))
+                all_features = sorted(
+                    glob(
+                        os.path.join(self.root_dir, self.model_name, f"**/{speaker}*.npy"),
+                        recursive=True,
+                    )
+                )
             else:
-                all_features = sorted(glob(os.path.join(self.root_dir, self.model_name, "**/*.npy"), recursive=True))
+                all_features = sorted(
+                    glob(os.path.join(self.root_dir, self.model_name, "**/*.npy"), recursive=True)
+                )
 
         if speaker is not None:
-            all_wavs = sorted(glob(os.path.join(self.wav_dir, f'**/{speaker}*' + self.extension), recursive=True))
+            all_wavs = sorted(
+                glob(os.path.join(self.wav_dir, f"**/{speaker}*" + self.extension), recursive=True)
+            )
         else:
-            all_wavs = sorted(glob(os.path.join(self.wav_dir, "**/*" + self.extension), recursive=True))
+            all_wavs = sorted(
+                glob(os.path.join(self.wav_dir, "**/*" + self.extension), recursive=True)
+            )
 
-        if self.num_files == -1: # sample all the data
+        if self.num_files == -1:  # sample all the data
             return all_features, all_wavs
-        
+
         paired_sample = list(zip(all_features, all_wavs))
         sample = random.sample(paired_sample, self.num_files)
         feature_sample, wavs_sample = zip(*sample)
@@ -113,12 +143,12 @@ class Features:
 
         for file in files:
             feature = torch.from_numpy(np.load(file))
-            if len(feature.shape) == 1: # if only one dimension, add a dimension
+            if len(feature.shape) == 1:  # if only one dimension, add a dimension
                 features.append(feature.unsqueeze(0))
             else:
                 features.append(feature)
         return features
-    
+
     def normalize_features(self, features):
         """
         Normalizes the features to have a mean of 0 and a standard deviation of 1
@@ -136,13 +166,17 @@ class Features:
             The normalized features
         """
 
-        stacked_features = torch.cat(features, dim=0) # concatenate all features into one tensor with size (sum_seq_len, feature_dim (channels))
+        stacked_features = torch.cat(
+            features, dim=0
+        )  # concatenate all features into one tensor with size (sum_seq_len, feature_dim (channels))
 
         scaler = StandardScaler()
-        scaler.partial_fit(stacked_features) # (n_samples, n_features)
+        scaler.partial_fit(stacked_features)  # (n_samples, n_features)
         normalized_features = []
         for feature in features:
-            normalized_features.append(torch.from_numpy(scaler.transform(feature))) # (n_samples, n_features)
+            normalized_features.append(
+                torch.from_numpy(scaler.transform(feature))
+            )  # (n_samples, n_features)
         return normalized_features
 
     def get_speakers(self, speaker_file):
@@ -164,7 +198,7 @@ class Features:
             language = os.path.split(self.wav_dir)[1]
             with open(speaker_file) as f:
                 metadata = json.load(f)
-                speaker_list = metadata['subsets'][f'{language}']['items']['wav_list']['files_list']
+                speaker_list = metadata["subsets"][f"{language}"]["items"]["wav_list"]["files_list"]
             speakers = []
             for speaker_file in speaker_list:
                 speakers.append(os.path.splitext(os.path.split(speaker_file)[1])[0])
@@ -173,7 +207,7 @@ class Features:
             with open(speaker_file) as f:
                 for line in f:
                     speakers.append(line.strip())
-        
+
         return sorted(speakers)
 
     def get_frame_num(self, seconds):
@@ -190,10 +224,12 @@ class Features:
         Return
         ------
         output : int
-            The feature frame number corresponding to the given number of seconds 
+            The feature frame number corresponding to the given number of seconds
         """
 
-        return np.round(seconds / self.frames_per_ms * 1000) # seconds (= samples / sample_rate) / x ms per frame * 1000ms per second
+        return np.round(
+            seconds / self.frames_per_ms * 1000
+        )  # seconds (= samples / sample_rate) / x ms per frame * 1000ms per second
 
     def get_sample_second(self, frame_num):
         """
@@ -212,4 +248,6 @@ class Features:
             The number of seconds corresponding to the given feature frame number
         """
 
-        return frame_num * self.frames_per_ms / 1000 # frame_num * x ms per frame / 1000ms per second
+        return (
+            frame_num * self.frames_per_ms / 1000
+        )  # frame_num * x ms per frame / 1000ms per second

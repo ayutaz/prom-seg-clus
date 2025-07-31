@@ -169,3 +169,8 @@ hello.py
 
 # Test data (generated)
 test_data/
+
+# LibriSpeech data
+data/
+dev-clean.tar.gz
+LibriSpeech/

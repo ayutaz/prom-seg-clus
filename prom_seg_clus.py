@@ -6,15 +6,18 @@ Contact: 24227013@sun.ac.za
 Date: August 2024
 """
 
-import numpy as np
 import argparse
+import os
 import random
 from pathlib import Path
-import os
+
+import numpy as np
+from sklearn.decomposition import PCA
 from tqdm import tqdm
+
 from utils import data_process
 from wordseg import cluster
-from sklearn.decomposition import PCA
+
 
 def get_data(data, args, speaker):
     """
@@ -32,7 +35,7 @@ def get_data(data, args, speaker):
 
     Return
     ------
-    lexicon_builder : 
+    lexicon_builder :
         The segmentations of the downsampled utterances
     samples : list (str)
         The list of the sampled file paths to the features of the utterances.
@@ -42,25 +45,29 @@ def get_data(data, args, speaker):
         The landmarks (in frames) of the utterances.
     """
 
-    samples, wavs = data.sample_features(speaker) # sample file paths from the speech features
-       
+    samples, wavs = data.sample_features(speaker)  # sample file paths from the speech features
+
     pca = None
     if args.model not in ["mfcc", "melspec"]:
-        print('Fitting PCA')
+        print("Fitting PCA")
         pca = PCA(n_components=250)
-        pca.fit(np.concatenate(data.load_features(random.sample(samples, int(0.8*len(samples)))), axis=0))
+        pca.fit(
+            np.concatenate(
+                data.load_features(random.sample(samples, int(0.8 * len(samples)))), axis=0
+            )
+        )
 
     if len(samples) == 0:
-        print('No features to segment, sampled a file with only one frame.')
+        print("No features to segment, sampled a file with only one frame.")
         exit()
-    
+
     # get landmarks, lenths, and segments
     landmarks, lengths = get_landmarks(data, args, wavs)
 
     segments = []
-    for landmark in landmarks: 
+    for landmark in landmarks:
         segment = np.concatenate(([0], landmark))
-        segment = [(segment[i], segment[i+1]) for i in range(len(segment)-1)]
+        segment = [(segment[i], segment[i + 1]) for i in range(len(segment) - 1)]
         segments.append(segment)
 
     # use fixed K_max
@@ -76,6 +83,7 @@ def get_data(data, args, speaker):
     lexicon_builder = cluster.CLUSTER(data, samples, segments, lengths, K_max, pca)
 
     return lexicon_builder, samples, wavs, landmarks
+
 
 def get_landmarks(data, args, wavs):
     """
@@ -109,11 +117,12 @@ def get_landmarks(data, args, wavs):
                 landmark.append(float(line.strip()))
             landmark = data.get_frame_num(np.array(landmark)).astype(np.int32).tolist()
             if landmark[-1] == 0:
-                landmark = [1] # fix rounding error (0.5 -> 0.0)
+                landmark = [1]  # fix rounding error (0.5 -> 0.0)
             landmarks.append(landmark)
         lengths.append(len(landmarks[-1]))
-    
+
     return landmarks, lengths
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Clustering prominence-segmented speech.")
@@ -123,7 +132,7 @@ if __name__ == "__main__":
         default="mfcc",
     )
     parser.add_argument(
-        "layer", # -1 for no layer
+        "layer",  # -1 for no layer
         type=int,
     )
     parser.add_argument(
@@ -187,13 +196,17 @@ if __name__ == "__main__":
     np.random.seed(42)
 
     # ~~~~~~~~~~ Setup data ~~~~~~~~~~
-    data = data_process.Features(wav_dir=args.wav_dir, root_dir=args.feature_dir, model_name=args.model, layer=args.layer, 
-                                 extension=args.extension, num_files=args.sample_size, frames_per_ms=frame_len)
+    data = data_process.Features(
+        wav_dir=args.wav_dir,
+        root_dir=args.feature_dir,
+        model_name=args.model,
+        layer=args.layer,
+        extension=args.extension,
+        num_files=args.sample_size,
+        frames_per_ms=frame_len,
+    )
 
-    if args.speaker is not None:
-        speakerlist = data.get_speakers(args.speaker)
-    else:
-        speakerlist = [None]
+    speakerlist = data.get_speakers(args.speaker) if args.speaker is not None else [None]
 
     for speaker in tqdm(speakerlist, desc="Speaker"):
         # ~~~~~~~~~~ Get data for all utterances without saving the features ~~~~~~~~~~~
@@ -203,12 +216,11 @@ if __name__ == "__main__":
         classes = lexicon_builder.cluster()
 
         # ~~~~~~~~~~~~~~~~~~~ Save utterance segments and assignments ~~~~~~~~~~~~~~~~~~~~
-        for i in tqdm(range(lexicon_builder.D), desc='Getting boundary frames and classes'): # for each utterance
+        for i in tqdm(
+            range(lexicon_builder.D), desc="Getting boundary frames and classes"
+        ):  # for each utterance
             segmentation_frames = landmarks[i]
-            if len(classes[i]) == 1:
-                class_i = classes[i]
-            else:
-                class_i = [x for x in classes[i] if x != -1]
+            class_i = classes[i] if len(classes[i]) == 1 else [x for x in classes[i] if x != -1]
             save_dir = (args.save_segments / os.path.split(wavs[i])[-1]).with_suffix(".list")
             save_dir.parent.mkdir(parents=True, exist_ok=True)
             with open(save_dir, "w") as f:

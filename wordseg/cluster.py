@@ -7,12 +7,15 @@ Date: April 2024
 """
 
 import random
+
+import faiss
 import numpy as np
 from tqdm import tqdm
-import faiss
+
 from wordseg import subsample
 
-class CLUSTER():
+
+class CLUSTER:
     """
     Clustering for prominence-detected word-like segments.
 
@@ -75,13 +78,15 @@ class CLUSTER():
             embeddings = self.pca.transform(embeddings)
             downsampled_embeddings = []
             for a, b in self.segments[i]:
-                if b > embeddings.shape[0]: # if the segment is longer than the utterance, stop at last frame
+                if (
+                    b > embeddings.shape[0]
+                ):  # if the segment is longer than the utterance, stop at last frame
                     if a < embeddings.shape[0]:
                         downsampled_embeddings.append(embeddings[a:, :].mean(0))
                     elif a == embeddings.shape[0]:
-                        downsampled_embeddings.append(embeddings[a-1:, :].mean(0))
-                elif a == b: # if the segment is empty, add one frame
-                    downsampled_embeddings.append(embeddings[a-1:b+1, :].mean(0))
+                        downsampled_embeddings.append(embeddings[a - 1 :, :].mean(0))
+                elif a == b:  # if the segment is empty, add one frame
+                    downsampled_embeddings.append(embeddings[a - 1 : b + 1, :].mean(0))
                 else:
                     downsampled_embeddings.append(embeddings[a:b, :].mean(0))
 
@@ -96,13 +101,15 @@ class CLUSTER():
             cur_embed = embeddings[frame_i, :]
             norm = np.linalg.norm(cur_embed)
             downsampled_utterance.append(cur_embed / np.linalg.norm(cur_embed))
-            assert norm != 0.
+            assert norm != 0.0
         embeddings = np.stack(downsampled_utterance)
 
         # assign each segment to the closest cluster centroid
-        classes = [-1]*len(self.segments[i])
+        classes = [-1] * len(self.segments[i])
         for i_index in range(len(classes)):
-            _, index = self.acoustic_model.index.search(embeddings[i_index].reshape(1, embeddings.shape[-1]), 1)
+            _, index = self.acoustic_model.index.search(
+                embeddings[i_index].reshape(1, embeddings.shape[-1]), 1
+            )
             classes[i_index] = index[0][0]
 
         return classes
@@ -118,24 +125,26 @@ class CLUSTER():
         """
 
         embeddings = []
-        for i_utt, (sample, segment) in enumerate(zip(self.samples, self.segments)):
+        for _i_utt, (sample, segment) in enumerate(zip(self.samples, self.segments)):
             downsampled_embedding = []
             if self.pca is not None:
                 embedding = self.pca.transform(self.data.load_features([sample])[0])
                 for a, b in segment:
-                    if b > embedding.shape[0]: # if the segment is longer than the utterance, stop at last frame
+                    if (
+                        b > embedding.shape[0]
+                    ):  # if the segment is longer than the utterance, stop at last frame
                         if a < embedding.shape[0]:
                             downsampled_embedding.append(embedding[a:, :].mean(0))
                         elif a == embedding.shape[0]:
-                            downsampled_embedding.append(embedding[a-1:, :].mean(0))
-                    elif a == b: # if the segment is empty, add one frame
-                        downsampled_embedding.append(embedding[a-1:b+1, :].mean(0))
+                            downsampled_embedding.append(embedding[a - 1 :, :].mean(0))
+                    elif a == b:  # if the segment is empty, add one frame
+                        downsampled_embedding.append(embedding[a - 1 : b + 1, :].mean(0))
                     else:
                         downsampled_embedding.append(embedding[a:b, :].mean(0))
                 embeddings.append(np.stack(downsampled_embedding))
             else:
                 embedding = self.data.load_features([sample])[0]
-                embeddings.append(subsample.downsample([embedding], [segment], n=10))            
+                embeddings.append(subsample.downsample([embedding], [segment], n=10))
 
         # normalize embedding (frame-wise)
         for i_utt in range(len(embeddings)):
@@ -144,21 +153,23 @@ class CLUSTER():
                 cur_embed = embeddings[i_utt][i, :]
                 norm = np.linalg.norm(cur_embed)
                 downsampled_utterance.append(cur_embed / np.linalg.norm(cur_embed))
-                assert norm != 0.
+                assert norm != 0.0
             embeddings[i_utt] = np.stack(downsampled_utterance)
-        
+
         # cluster segment embeddings
         embeddings = np.concatenate(embeddings, axis=0)
-        self.acoustic_model = faiss.Kmeans(embeddings.shape[1], self.K_max, niter=15, nredo=3, verbose=True)
+        self.acoustic_model = faiss.Kmeans(
+            embeddings.shape[1], self.K_max, niter=15, nredo=3, verbose=True
+        )
         self.acoustic_model.train(embeddings)
 
         # assigning clusters
-        classes = [None]*self.D
+        classes = [None] * self.D
         utt_order = list(range(self.D))
         random.shuffle(utt_order)
 
         for i_utt in tqdm(utt_order, desc="Cluster Assignments"):
             i_classes = self.assign_utt_i(i_utt)
             classes[i_utt] = i_classes
-            
+
         return classes
