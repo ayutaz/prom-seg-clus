@@ -64,8 +64,9 @@ def setup_librispeech():
     flac_files = list(source_dir.glob("**/*.flac"))
     print(f"{len(flac_files)}個のFLACファイルが見つかりました")
 
-    # サンプルとして最初の50ファイルのみ処理（全部だと時間がかかるため）
-    for _i, flac_path in enumerate(tqdm(flac_files[:50], desc="音声ファイルをコピー")):
+    # より多くのファイルを処理（500ファイル）
+    num_files = min(500, len(flac_files))  # 最大500ファイルまたは全ファイル
+    for _i, flac_path in enumerate(tqdm(flac_files[:num_files], desc="音声ファイルをコピー")):
         # スピーカーID-チャプターID-発話ID の形式でファイル名を作成
         parts = flac_path.parts
         speaker_id = parts[-3]
@@ -77,7 +78,7 @@ def setup_librispeech():
 
         shutil.copy2(flac_path, target_path)
 
-    print(f"\n{min(50, len(flac_files))}個のファイルをdata/librispeech/audioにコピーしました")
+    print(f"\n{num_files}個のファイルをdata/librispeech/audioにコピーしました")
 
     # アライメント情報のダウンロード
     # alignment_url = "https://zenodo.org/records/2619474/files/librispeech_alignments.zip"
