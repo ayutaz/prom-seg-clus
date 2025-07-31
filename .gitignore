@@ -166,3 +166,6 @@ cython_debug/
 
 # Test files
 hello.py
+
+# Test data (generated)
+test_data/
