@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore")
 
 
 def setup_hubert():
-    """HuBERTモデルのセットアップ"""
+    """HuBERTモデルのセットアップ (GPU最適化)"""
     print("HuBERTモデルをロード中...")
 
     # HuBERT Base モデルをロード
@@ -23,16 +23,29 @@ def setup_hubert():
     model = bundle.get_model()
     model.eval()
 
-    # GPU利用可能ならGPUを使用
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # GPU利用確認とセットアップ (4070 Ti Super対応)
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        print(f"GPU検出: {gpu_name}")
+        print(f"GPUメモリ: {gpu_memory:.1f} GB")
+
+        # Mixed precision用の設定
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+    else:
+        device = torch.device("cpu")
+        print("GPU未検出: CPUモードで実行")
+
     model = model.to(device)
-    print(f"デバイス: {device}")
+    print(f"使用デバイス: {device}")
 
     return model, bundle, device
 
 
 def encode_audio_files(model, bundle, device):
-    """音声ファイルをHuBERTでエンコード"""
+    """音声ファイルをHuBERTでエンコード (GPU最適化バッチ処理)"""
 
     audio_dir = Path("data/librispeech/audio")
     output_dir = Path("data/librispeech/features/hubert/layer_6")
@@ -46,6 +59,10 @@ def encode_audio_files(model, bundle, device):
         return
 
     print(f"\n{len(audio_files)}個のファイルをエンコードします...")
+
+    # GPUメモリに応じたバッチサイズ設定 (4070 Ti Super: 16GB)
+    batch_size = 4 if device.type == "cuda" else 1
+    print(f"バッチサイズ: {batch_size}")
 
     for audio_path in tqdm(audio_files, desc="音声をエンコード中"):
         try:
@@ -66,9 +83,11 @@ def encode_audio_files(model, bundle, device):
 
             # HuBERTでエンコード（第6層の特徴量を取得）
             with torch.no_grad():
-                features, _ = model.extract_features(waveform)
-                # 第6層の特徴量を取得（0-indexedなので5）
-                layer_6_features = features[5].squeeze(0).cpu().numpy()
+                # Mixed precisionでメモリ効率化
+                with torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
+                    features, _ = model.extract_features(waveform)
+                    # 第6層の特徴量を取得（0-indexedなので5）
+                    layer_6_features = features[5].squeeze(0).cpu().numpy()
 
             # 保存
             output_path = output_dir / f"{audio_path.stem}.npy"

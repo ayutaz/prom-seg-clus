@@ -83,9 +83,15 @@ uv run python run_librispeech_pipeline.py
 - 初回実行時はモデルのダウンロードに時間がかかります
 - 一度ダウンロードされればキャッシュされます
 
-### 境界抽出の精度
-- 簡易実装のため、実際の単語境界とは異なる可能性があります
-- より正確な境界が必要な場合は、公式のprom-word-segツールを使用してください
+### GPU最適化
+- RTX 4070 Ti Super (16GB VRAM)に最適化されています
+- Mixed precisionとcuDNN最適化が自動的に有効になります
+- バッチサイズはGPUメモリに応じて自動調整されます
+
+### 境界抽出アルゴリズム
+- s-malan/prom-word-seg の正確な実装を使用
+- フレーム間特徴量距離とprominence-based peak detectionを実装
+- パラメータ調整可能（window_size、prominence_threshold等）
 
 ## カスタマイズ
 
