@@ -174,3 +174,26 @@ test_data/
 data/
 dev-clean.tar.gz
 LibriSpeech/
+
+# Audio files
+*.wav
+*.flac
+*.mp3
+
+# Analysis outputs
+*.png
+*.jpg
+*.jpeg
+*.pdf
+evaluation_report.txt
+
+# Export directories
+exported_audio/
+exported_audio_fixed/
+cluster_evaluation/
+consistent_clusters/
+temp_audio/
+
+# Test outputs
+test_*.wav
+debug_*.png
